@@ -269,7 +269,7 @@
   <div class="logo">
     <img src="logo.png" alt="logo" class="logo-img">
   </div>
-  <h1>Absensi Karyawan <span>PT. ABEST</span></h1>
+  <h1>Absensi Karyawan <br><span>PT. ABEST</span></h1>
   <div class="subtitle">Catat kehadiranmu sekarang</div>
 </div>
 
@@ -617,8 +617,29 @@ startCamera();
 // Jika halaman tidak aktif lalu aktif lagi (misal balik dari tab lain),
 // kamera kadang mati — restart otomatis
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && !photoBlob && !cameraReady) {
-    startCamera();
+  if (document.hidden) {
+    // Tab tidak aktif → matikan kamera
+    if (!photoBlob) {
+      stopStream();
+      cameraReady = false;
+      document.getElementById('captureBtn').disabled = true;
+      setCamStatus('📷 Tap "Coba Lagi" untuk mengaktifkan kamera');
+      // Tambah tombol retry manual
+      const statusEl = document.getElementById('camStatus');
+      const old = statusEl.querySelector('.cam-retry-btn');
+      if (!old) {
+        const btn = document.createElement('button');
+        btn.className = 'cam-retry-btn';
+        btn.textContent = '🔄 Aktifkan Kamera';
+        btn.onclick = () => startCamera();
+        statusEl.appendChild(btn);
+      }
+    }
+  } else {
+    // Tab aktif kembali → restart otomatis jika belum ada foto
+    if (!photoBlob && !cameraReady) {
+      startCamera();
+    }
   }
 });
 
