@@ -41,9 +41,7 @@
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 50px; padding: 12px 28px; margin-bottom: 20px;
   }
-  .logo-img {
-    width: 140px;
-  }
+  .logo-img { width: 140px; }
   .logo-dot {
     width: 8px; height: 8px; background: var(--accent);
     border-radius: 50%; box-shadow: 0 0 8px var(--accent); animation: pulse 2s infinite;
@@ -85,7 +83,6 @@
   select option { background: #1a2235; }
   select:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Employee name selector */
   .nama-wrap { position: relative; margin-top: 14px; }
   .nama-loading {
     position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
@@ -102,7 +99,6 @@
   .nama-hint.ok { color: var(--accent); }
   .nama-hint.err { color: var(--danger); }
 
-  /* Type selector */
   .type-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
   .type-opt {
     padding: 12px; border-radius: 12px; border: 2px solid var(--border);
@@ -119,7 +115,12 @@
     border-radius: 14px; overflow: hidden; background: #000;
     border: 2px solid var(--border); margin-bottom: 12px;
   }
-  #videoEl { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  #videoEl {
+    width: 100%; height: 100%; object-fit: cover;
+    transform: scaleX(-1);
+    /* Fixes black screen on some iOS/Android */
+    -webkit-transform: scaleX(-1);
+  }
   .cam-overlay { position: absolute; inset: 0; pointer-events: none; }
   .cam-corner { position: absolute; width: 24px; height: 24px; border-color: var(--accent); border-style: solid; opacity: 0.8; }
   .cam-corner.tl { top:10px; left:10px;   border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
@@ -130,6 +131,23 @@
     position: absolute; top:50%; left:50%; transform:translate(-50%,-50%);
     width:90px; height:110px; border:1.5px dashed rgba(0,212,170,0.3); border-radius:60px;
   }
+
+  /* Camera status overlay */
+  .cam-status {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px;
+    background: rgba(0,0,0,0.7); font-size: 13px; color: var(--muted);
+    text-align: center; padding: 20px; transition: opacity 0.3s;
+  }
+  .cam-status.hidden { opacity: 0; pointer-events: none; }
+  .cam-status-icon { font-size: 32px; }
+  .cam-retry-btn {
+    margin-top: 8px; padding: 8px 18px; border-radius: 8px;
+    background: var(--accent); color: #0a0e1a; border: none;
+    font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 700;
+    cursor: pointer;
+  }
+
   #canvasEl { display: none; }
   #previewImg { width:100%; border-radius:14px; display:none; border:2px solid var(--accent); margin-bottom:12px; }
 
@@ -156,7 +174,6 @@
   .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(0,212,170,0.3); }
   .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; background: linear-gradient(135deg, #3a4455, #2a3344); color: var(--muted); }
 
-  /* GPS */
   .gps-wrap { background: var(--surface2); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
   .gps-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
   .gps-icon-box {
@@ -192,7 +209,6 @@
     padding: 10px 12px; line-height: 2; display: none;
   }
 
-  /* Toast */
   .toast {
     position: fixed; bottom: 24px; left: 50%;
     transform: translateX(-50%) translateY(100px);
@@ -239,7 +255,6 @@
     border-radius: 12px; padding: 14px 16px; font-size: 13px; color: #ff8090;
     line-height: 1.6; margin-top: 10px; text-align: center; display: none;
   }
-
 </style>
 </head>
 <body>
@@ -252,9 +267,7 @@
 
 <div class="header">
   <div class="logo">
-    <img src="logo.png" alt="logo" srcset="" class="logo-img">
-    <!-- <div class="logo-dot"></div>
-    <span>Sistem Absensi</span> -->
+    <img src="logo.png" alt="logo" class="logo-img">
   </div>
   <h1>Absensi Karyawan <span>PT. ABEST</span></h1>
   <div class="subtitle">Catat kehadiranmu sekarang</div>
@@ -321,10 +334,10 @@
   <label>Jenis Absensi</label>
   <div class="type-selector">
     <div class="type-opt active-in" id="typeIn" onclick="selectType('Masuk')">
-      <span class="emoji">🌅</span>Absen Masuk
+      <span class="emoji">🟢</span>Absen Masuk
     </div>
     <div class="type-opt" id="typeOut" onclick="selectType('Pulang')">
-      <span class="emoji">🌙</span>Absen Pulang
+      <span class="emoji">🔴</span>Absen Pulang
     </div>
   </div>
 
@@ -339,18 +352,35 @@
 <div class="card" style="max-width:440px;width:100%;">
   <div class="section-label">Foto Selfie</div>
   <div class="cam-container" id="camContainer">
-    <video id="videoEl" autoplay playsinline></video>
+    <!--
+      PERBAIKAN LAYAR HITAM DI HP:
+      1. Tambah webkit-playsinline untuk iOS Safari
+      2. Tambah muted (wajib untuk autoplay di mobile)
+      3. Hapus transform dari CSS, pakai style inline agar tidak konflik rendering
+    -->
+    <video id="videoEl"
+      autoplay
+      playsinline
+      webkit-playsinline
+      muted
+      style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);-webkit-transform:scaleX(-1);">
+    </video>
     <div class="cam-overlay">
       <div class="cam-corner tl"></div><div class="cam-corner tr"></div>
       <div class="cam-corner bl"></div><div class="cam-corner br"></div>
       <div class="cam-guide"></div>
+    </div>
+    <!-- Status overlay: loading / error / retry -->
+    <div class="cam-status" id="camStatus">
+      <div class="cam-status-icon">📷</div>
+      <div id="camStatusText">Memuat kamera...</div>
     </div>
   </div>
   <canvas id="canvasEl"></canvas>
   <img id="previewImg" alt="Preview selfie">
   <div class="btn-row">
     <button class="btn btn-ghost" id="retakeBtn" onclick="retake()" style="display:none;">↺ Ulang</button>
-    <button class="btn btn-accent" id="captureBtn" onclick="capturePhoto()">📷 Ambil Foto</button>
+    <button class="btn btn-accent" id="captureBtn" onclick="capturePhoto()" disabled>📷 Ambil Foto</button>
   </div>
 </div>
 
@@ -365,38 +395,30 @@
 
 <script>
 // ============================================================
-// KONFIGURASI — GANTI SEMUA YANG BERTANDA YOUR_...
+// KONFIGURASI
 // ============================================================
 const SUPABASE_URL      = 'https://mxdntgktexkyefhasbok.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14ZG50Z2t0ZXhreWVmaGFzYm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MzcwNzYsImV4cCI6MjA4NzMxMzA3Nn0.woRUh3Xtzt6esY2k3iX7jg4LnLxYwVk9aHf4iuSZP_w';
-
-// URL Apps Script Web App (setelah deploy)
-// Cara deploy: Apps Script → Deploy → New Deployment →
-// Type: Web App → Execute as: Me → Who has access: Anyone → Deploy
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzvZxxStib8S48wqUk4ogYJvU9GiHPwV4nHRi2FtWTNXZ7qTTZfGhSfSZyb2pLrMcrMyw/exec';
 // ============================================================
 
-// ============================================================
-// TITIK LOKASI & RADIUS
-// ============================================================
 const LOCATIONS = [
-  { nama: 'Kantor', lat: -2.2981699,  lng: 102.7174364, radius: 50  },
+  { nama: 'Kantor',       lat: -2.2981699,  lng: 102.7174364, radius: 50  },
   { nama: 'Area Tambang', lat: -2.3345061,  lng: 102.7718864, radius: 750 },
   { nama: 'Stockpile',    lat: -2.3225577,  lng: 102.7564114, radius: 200 },
   { nama: 'Kantor Jambi', lat: -1.6421916,  lng: 103.5777065, radius: 30  },
 ];
-// ============================================================
 
 const { createClient } = supabase;
 let sb;
-let gpsData            = null;
-let photoBlob          = null;
-let absensiType        = 'Masuk';
-let stream             = null;
-let locationAllowed    = false;
+let gpsData              = null;
+let photoBlob            = null;
+let absensiType          = 'Masuk';
+let stream               = null;
+let locationAllowed      = false;
 let detectedLocationName = null;
+let cameraReady          = false;
 
-// ---- Init ----
 if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL') {
   document.getElementById('configNotice').style.display = 'block';
 } else {
@@ -463,7 +485,7 @@ function handleGPSSuccess(pos) {
 }
 
 function handleGPSError(err) {
-  const msg = {1:'Izin lokasi ditolak. Aktifkan akses lokasi di browser.',2:'Sinyal GPS lemah. Coba di area terbuka.',3:'Timeout. Muat ulang halaman.'}[err.code] || 'Gagal ambil GPS.';
+  const msg = {1:'Izin lokasi ditolak.',2:'Sinyal GPS lemah. Coba di area terbuka.',3:'Timeout. Muat ulang halaman.'}[err.code] || 'Gagal ambil GPS.';
   setGPSState('fail','⚠️','Gagal Ambil Lokasi', msg, false);
   updatePill('pill-blocked', '⚠️ ' + msg);
   document.getElementById('blockedNotice').style.display = 'block';
@@ -474,7 +496,6 @@ function setGPSState(state, icon, label, coords, allowed) {
   document.getElementById('gpsIconBox').className = `gps-icon-box ${state}`;
   document.getElementById('gpsLabel').textContent = label;
   document.getElementById('gpsCoordsEl').textContent = coords;
-  // Tombol submit hanya aktif jika lokasi OK (nama & dept juga dicek di submitAbsensi)
   if (!allowed) {
     document.getElementById('submitBtn').disabled = true;
     document.getElementById('blockedNotice').style.display = 'block';
@@ -489,95 +510,128 @@ function updatePill(cls, text) {
 
 startGPS();
 
-// ---- Fetch karyawan dari Apps Script ----
-async function onDeptChange() {
-  const dept = document.getElementById('deptInput').value;
-  const namaSelect = document.getElementById('namaInput');
-  const hint = document.getElementById('namaHint');
-  const loading = document.getElementById('namaLoading');
+// ---- Camera (PERBAIKAN UTAMA) ----
 
-  // Reset
-  namaSelect.innerHTML = '<option value="">-- Pilih Nama --</option>';
-  namaSelect.disabled = true;
-  document.getElementById('submitBtn').disabled = true;
+/**
+ * Urutan constraint yang dicoba saat kamera gagal.
+ * Mulai dari yang paling spesifik, mundur ke yang paling umum.
+ * Ini mencegah layar hitam di HP yang tidak support resolusi tertentu.
+ */
+const CAM_CONSTRAINTS_FALLBACK = [
+  { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+  { video: { facingMode: 'user' }, audio: false },
+  { video: true, audio: false },
+];
 
-  if (!dept) {
-    hint.textContent = '👆 Pilih departemen untuk memuat daftar nama';
-    hint.className = 'nama-hint';
+function setCamStatus(text, showRetry = false) {
+  const el = document.getElementById('camStatus');
+  const textEl = document.getElementById('camStatusText');
+  textEl.textContent = text;
+  // Remove old retry button if any
+  const old = el.querySelector('.cam-retry-btn');
+  if (old) old.remove();
+  if (showRetry) {
+    const btn = document.createElement('button');
+    btn.className = 'cam-retry-btn';
+    btn.textContent = '🔄 Coba Lagi';
+    btn.onclick = () => startCamera();
+    el.appendChild(btn);
+  }
+  el.classList.remove('hidden');
+}
+
+function hideCamStatus() {
+  document.getElementById('camStatus').classList.add('hidden');
+}
+
+async function startCamera(constraintIndex = 0) {
+  // Stop existing stream dulu agar tidak bentrok
+  stopStream();
+  cameraReady = false;
+  document.getElementById('captureBtn').disabled = true;
+  setCamStatus('Memuat kamera...');
+
+  if (constraintIndex >= CAM_CONSTRAINTS_FALLBACK.length) {
+    setCamStatus('❌ Kamera tidak dapat diakses. Pastikan izin kamera sudah diberikan.', true);
+    showToast('❌ Kamera gagal dibuka.', 'error');
     return;
   }
-
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL') {
-    hint.textContent = '⚠️ Apps Script URL belum dikonfigurasi';
-    hint.className = 'nama-hint err';
-    return;
-  }
-
-  // Show loading spinner
-  loading.style.display = 'block';
-  hint.textContent = `Memuat daftar karyawan ${dept}...`;
-  hint.className = 'nama-hint';
 
   try {
-    const url = `${APPS_SCRIPT_URL}?dept=${encodeURIComponent(dept)}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
+    const constraints = CAM_CONSTRAINTS_FALLBACK[constraintIndex];
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-    loading.style.display = 'none';
+    const video = document.getElementById('videoEl');
+    video.srcObject = stream;
 
-    if (json.status === 'error') throw new Error(json.message);
+    // Tunggu metadata video siap sebelum play — fix utama layar hitam
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = resolve;
+      video.onerror = reject;
+      // Timeout safety: jika 8 detik tidak ada metadata, coba constraint berikutnya
+      setTimeout(() => reject(new Error('metadata timeout')), 8000);
+    });
 
-    const names = json.names || [];
+    // Eksplisit panggil play() dan tunggu promise-nya
+    await video.play();
 
-    if (names.length === 0) {
-      hint.textContent = `⚠️ Tidak ada karyawan di departemen ${dept}`;
-      hint.className = 'nama-hint err';
-      namaSelect.innerHTML = '<option value="">-- Tidak ada data --</option>';
-      namaSelect.disabled = true;
-      return;
+    // Kamera siap
+    cameraReady = true;
+    hideCamStatus();
+    document.getElementById('captureBtn').disabled = false;
+
+  } catch (err) {
+    console.warn(`Kamera gagal dengan constraint #${constraintIndex}:`, err.name, err.message);
+    stopStream();
+
+    // Jika NotReadableError atau OverconstrainedError, coba constraint lebih longgar
+    if (
+      err.name === 'NotReadableError' ||
+      err.name === 'OverconstrainedError' ||
+      err.name === 'TrackStartError' ||
+      err.message === 'metadata timeout'
+    ) {
+      setCamStatus(`Mencoba ulang kamera... (${constraintIndex + 2}/${CAM_CONSTRAINTS_FALLBACK.length})`);
+      setTimeout(() => startCamera(constraintIndex + 1), 800);
+    } else if (err.name === 'NotAllowedError') {
+      setCamStatus('🚫 Izin kamera ditolak.\nBuka pengaturan browser dan izinkan akses kamera.', true);
+    } else {
+      // Coba constraint berikutnya
+      setTimeout(() => startCamera(constraintIndex + 1), 800);
     }
-
-    // Populate dropdown
-    namaSelect.innerHTML = '<option value="">-- Pilih Nama Kamu --</option>' +
-      names.map(n => `<option value="${n}">${n}</option>`).join('');
-    namaSelect.disabled = false;
-    namaSelect.onchange = () => updateSubmitBtn();
-
-    hint.textContent = `✅ ${names.length} karyawan ditemukan`;
-    hint.className = 'nama-hint ok';
-
-  } catch (e) {
-    loading.style.display = 'none';
-    hint.textContent = `❌ Gagal memuat data: ${e.message}`;
-    hint.className = 'nama-hint err';
-    namaSelect.innerHTML = '<option value="">-- Gagal memuat --</option>';
-    namaSelect.disabled = true;
-    console.error('Apps Script error:', e);
   }
 }
 
-// Aktifkan tombol submit hanya jika nama dipilih & lokasi OK
-function updateSubmitBtn() {
-  const nama = document.getElementById('namaInput').value;
-  document.getElementById('submitBtn').disabled = !(nama && locationAllowed);
+function stopStream() {
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+  const video = document.getElementById('videoEl');
+  video.srcObject = null;
 }
 
-// ---- Camera ----
-async function startCamera() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width:640, height:480 }, audio: false });
-    document.getElementById('videoEl').srcObject = stream;
-  } catch (e) { showToast('❌ Kamera tidak dapat diakses.', 'error'); }
-}
+// Start kamera saat halaman load
 startCamera();
 
+// Jika halaman tidak aktif lalu aktif lagi (misal balik dari tab lain),
+// kamera kadang mati — restart otomatis
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !photoBlob && !cameraReady) {
+    startCamera();
+  }
+});
+
 function capturePhoto() {
+  if (!cameraReady) { showToast('⚠️ Kamera belum siap.', 'error'); return; }
   const video = document.getElementById('videoEl');
   const canvas = document.getElementById('canvasEl');
-  canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
   const ctx = canvas.getContext('2d');
-  ctx.translate(canvas.width, 0); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0);
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0);
   canvas.toBlob(blob => {
     photoBlob = blob;
     document.getElementById('previewImg').src = URL.createObjectURL(blob);
@@ -585,7 +639,7 @@ function capturePhoto() {
     document.getElementById('camContainer').style.display = 'none';
     document.getElementById('captureBtn').style.display = 'none';
     document.getElementById('retakeBtn').style.display = 'flex';
-    if (stream) stream.getTracks().forEach(t => t.stop());
+    stopStream();
   }, 'image/jpeg', 0.85);
 }
 
@@ -605,33 +659,94 @@ function selectType(type) {
   document.getElementById('typeOut').className = 'type-opt' + (type === 'Pulang' ? ' active-out' : '');
 }
 
+// ---- Fetch karyawan ----
+async function onDeptChange() {
+  const dept = document.getElementById('deptInput').value;
+  const namaSelect = document.getElementById('namaInput');
+  const hint = document.getElementById('namaHint');
+  const loading = document.getElementById('namaLoading');
+
+  namaSelect.innerHTML = '<option value="">-- Pilih Nama --</option>';
+  namaSelect.disabled = true;
+  document.getElementById('submitBtn').disabled = true;
+
+  if (!dept) {
+    hint.textContent = '👆 Pilih departemen untuk memuat daftar nama';
+    hint.className = 'nama-hint';
+    return;
+  }
+
+  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL') {
+    hint.textContent = '⚠️ Apps Script URL belum dikonfigurasi';
+    hint.className = 'nama-hint err';
+    return;
+  }
+
+  loading.style.display = 'block';
+  hint.textContent = `Memuat daftar karyawan ${dept}...`;
+  hint.className = 'nama-hint';
+
+  try {
+    const url = `${APPS_SCRIPT_URL}?dept=${encodeURIComponent(dept)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    loading.style.display = 'none';
+    if (json.status === 'error') throw new Error(json.message);
+    const names = json.names || [];
+    if (names.length === 0) {
+      hint.textContent = `⚠️ Tidak ada karyawan di departemen ${dept}`;
+      hint.className = 'nama-hint err';
+      namaSelect.innerHTML = '<option value="">-- Tidak ada data --</option>';
+      namaSelect.disabled = true;
+      return;
+    }
+    namaSelect.innerHTML = '<option value="">-- Pilih Nama Kamu --</option>' +
+      names.map(n => `<option value="${n}">${n}</option>`).join('');
+    namaSelect.disabled = false;
+    namaSelect.onchange = () => updateSubmitBtn();
+    hint.textContent = `✅ ${names.length} karyawan ditemukan`;
+    hint.className = 'nama-hint ok';
+  } catch (e) {
+    loading.style.display = 'none';
+    hint.textContent = `❌ Gagal memuat data: ${e.message}`;
+    hint.className = 'nama-hint err';
+    namaSelect.innerHTML = '<option value="">-- Gagal memuat --</option>';
+    namaSelect.disabled = true;
+    console.error('Apps Script error:', e);
+  }
+}
+
+function updateSubmitBtn() {
+  const nama = document.getElementById('namaInput').value;
+  document.getElementById('submitBtn').disabled = !(nama && locationAllowed);
+}
+
 // ---- Submit ----
 async function submitAbsensi() {
   if (!sb) { showToast('❌ Konfigurasi Supabase belum diisi!', 'error'); return; }
   if (!locationAllowed || !gpsData) { showToast('⛔ Kamu berada di luar area absensi!', 'error'); return; }
 
-  const nama = document.getElementById('namaInput').value;
-  const dept = document.getElementById('deptInput').value;
+  const nama  = document.getElementById('namaInput').value;
+  const dept  = document.getElementById('deptInput').value;
   const shift = document.getElementById('shiftInput').value;
 
-  if (!nama) { showToast('⚠️ Pilih nama karyawan!', 'error'); return; }
-  if (!dept) { showToast('⚠️ Pilih departemen!', 'error'); return; }
+  if (!nama)      { showToast('⚠️ Pilih nama karyawan!', 'error'); return; }
+  if (!dept)      { showToast('⚠️ Pilih departemen!', 'error'); return; }
   if (!photoBlob) { showToast('⚠️ Foto selfie belum diambil!', 'error'); return; }
 
   document.getElementById('loadingOverlay').classList.add('show');
 
-  const now = new Date();
-  const n = new Date();
-  const dd  = String(n.getDate()).padStart(2,'0');
-  const mm  = String(n.getMonth()+1).padStart(2,'0');
+  const n    = new Date();
+  const dd   = String(n.getDate()).padStart(2,'0');
+  const mm   = String(n.getMonth()+1).padStart(2,'0');
   const yyyy = n.getFullYear();
-  const HH  = String(n.getHours()).padStart(2,'0');
-  const MM  = String(n.getMinutes()).padStart(2,'0');
-  const SS  = String(n.getSeconds()).padStart(2,'0');
+  const HH   = String(n.getHours()).padStart(2,'0');
+  const MM   = String(n.getMinutes()).padStart(2,'0');
+  const SS   = String(n.getSeconds()).padStart(2,'0');
   const fileName = `${nama.replace(/\s+/g,'_')}_${dd}-${mm}-${yyyy}_${HH}-${MM}-${SS}.jpg`;
 
   try {
-    // Upload foto ke Supabase Storage
     const { error: uploadErr } = await sb.storage
       .from('foto-absensi')
       .upload(fileName, photoBlob, { contentType: 'image/jpeg', upsert: false });
@@ -639,25 +754,23 @@ async function submitAbsensi() {
 
     const { data: { publicUrl } } = sb.storage.from('foto-absensi').getPublicUrl(fileName);
 
-    // Insert record ke Supabase DB
     const { error: insertErr } = await sb.from('absensi').insert({
-      waktu: `${yyyy}-${mm}-${dd} ${HH}:${MM}:${SS}`,
+      waktu:       `${yyyy}-${mm}-${dd} ${HH}:${MM}:${SS}`,
       nama,
-      departemen:   dept,
-      lokasi:  detectedLocationName,
-      jenis_absen:       absensiType,
+      departemen:  dept,
+      lokasi:      detectedLocationName,
+      jenis_absen: absensiType,
       shift,
-      lat:          gpsData.lat,
-      lng:          gpsData.lng,
-      akurasi_gps:  gpsData.acc,
-      foto_url:     publicUrl,
+      lat:         gpsData.lat,
+      lng:         gpsData.lng,
+      akurasi_gps: gpsData.acc,
+      foto_url:    publicUrl,
     });
     if (insertErr) throw insertErr;
 
     document.getElementById('loadingOverlay').classList.remove('show');
     showToast('✅ Absensi berhasil dicatat!', 'success');
 
-    // Reset form
     setTimeout(() => {
       document.getElementById('deptInput').value = '';
       document.getElementById('namaInput').innerHTML = '<option value="">-- Pilih departemen dulu --</option>';
